@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Bank Card Casino TMA</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg: #090b10;
+      --card-w: 336px;
+      --card-h: 210px;
+      --digit-h: 28px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px;
+      overflow-x: hidden;
+      perspective: 1200px;
+    }
+
+    /* Профиль Telegram */
+    .user-profile {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 5px 14px 5px 6px;
+      border-radius: 40px;
+    }
+
+    .user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #1e293b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 13px;
+      color: #94a3b8;
+      overflow: hidden;
+    }
+
+    .user-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .user-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #cbd5e1;
+    }
+
+    /* Информационная панель */
+    .info-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      margin: 10px 0 16px 0;
+      text-align: center;
+      min-height: 70px;
+    }
+
+    .rarity-word {
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      line-height: 1;
+      transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .rarity-common    { color: #94a3b8; text-shadow: 0 0 15px rgba(148, 163, 184, 0.2); }
+    .rarity-rare      { color: #e2e8f0; text-shadow: 0 0 20px rgba(226, 232, 240, 0.5); }
+    .rarity-legendary { color: #fbbf24; text-shadow: 0 0 25px rgba(251, 191, 36, 0.7); }
+    .rarity-mythic    { color: #c084fc; text-shadow: 0 0 30px rgba(192, 132, 252, 0.85); }
+
+    .sub-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #64748b;
+    }
+
+    .tier-badge {
+      background: rgba(255, 255, 255, 0.08);
+      padding: 3px 10px;
+      border-radius: 6px;
+      color: #f1f5f9;
+      letter-spacing: 1px;
+    }
+
+    /* 3D Сцена карты */
+    .card-scene {
+      width: var(--card-w);
+      height: var(--card-h);
+      position: relative;
+    }
+
+    .card {
+      width: 100%;
+      height: 100%;
+      border-radius: 20px;
+      padding: 22px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+      transform-style: preserve-3d;
+      will-change: transform, box-shadow;
+      transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.6s ease;
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.75), inset 0 1px 1px rgba(255, 255, 255, 0.2);
+    }
+
+    /* Фоновые слои */
+    .card-art {
+      position: absolute;
+      inset: 0;
+      border-radius: 20px;
+      opacity: 1;
+      transition: opacity 0.45s ease, transform 0.45s ease;
+      z-index: 1;
+    }
+
+    /* Живая ртутная текстура кручения */
+    .card-spinner-bg {
+      position: absolute;
+      inset: 0;
+      border-radius: 20px;
+      background: linear-gradient(120deg, #181d27 0%, #3a475d 25%, #151922 50%, #475569 75%, #181d27 100%);
+      background-size: 300% 300%;
+      opacity: 0;
+      transition: opacity 0.35s ease;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .card.is-spinning {
+      transform: scale(0.93) rotateX(12deg);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.9), 0 0 40px rgba(148, 163, 184, 0.25);
+    }
+
+    .card.is-spinning .card-spinner-bg {
+      opacity: 1;
+      animation: mercuryFlow 1.4s infinite linear;
+    }
+
+    .card.is-spinning .card-art {
+      opacity: 0;
+      transform: scale(1.08);
+    }
+
+    @keyframes mercuryFlow {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    /* Верхний ряд */
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      position: relative;
+      z-index: 3;
+    }
+
+    .chip {
+      width: 44px;
+      height: 32px;
+      background: linear-gradient(135deg, #e7ca79 0%, #ab8529 50%, #e0bd60 100%);
+      border-radius: 6px;
+      box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.4), 0 2px 4px rgba(0,0,0,0.5);
+    }
+
+    .nfc-icon {
+      width: 24px;
+      height: 24px;
+      fill: none;
+      stroke: rgba(255, 255, 255, 0.65);
+      stroke-width: 2.2;
+      stroke-linecap: round;
+    }
+
+    /* 60 FPS Слот-барабаны для цифр */
+    .card-number-viewport {
+      display: flex;
+      justify-content: space-between;
+      position: relative;
+      z-index: 3;
+      margin: 10px 0;
+    }
+
+    .digit-group {
+      display: flex;
+      gap: 3px;
+    }
+
+    .slot-digit {
+      width: 15px;
+      height: var(--digit-h);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .slot-reel {
+      display: flex;
+      flex-direction: column;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      will-change: transform;
+      transform: translate3d(0, 0, 0);
+    }
+
+    .reel-num {
+      width: 15px;
+      height: var(--digit-h);
+      line-height: var(--digit-h);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Share Tech Mono', 'Courier New', monospace;
+      font-size: 24px;
+      font-weight: 700;
+      color: #f8fafc;
+      text-shadow: 0 2px 3px rgba(0, 0, 0, 0.9), 0 -1px 1px rgba(255, 255, 255, 0.3);
+    }
+
+    .slot-reel.blurring {
+      filter: blur(2px);
+    }
+
+    /* Слот-барабан логотипов */
+    .card-bottom {
+      display: flex;
+      justify-content: flex-end;
+      align-items: flex-end;
+      position: relative;
+      z-index: 3;
+      height: 44px;
+    }
+
+    .network-viewport {
+      height: 44px;
+      width: 100px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .network-reel {
+      display: flex;
+      flex-direction: column;
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 100%;
+      will-change: transform;
+    }
+
+    .network-item {
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .network-item svg {
+      max-height: 40px;
+      max-width: 95px;
+      display: block;
+    }
+
+    /* Кнопка запуска */
+    .controls {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      max-width: var(--card-w);
+      margin-bottom: 12px;
+    }
+
+    .btn-spin {
+      width: 100%;
+      height: 54px;
+      border: none;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%);
+      color: #0b0f19;
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(255, 255, 255, 0.15);
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+
+    .btn-spin:active {
+      transform: scale(0.97);
+    }
+
+    .btn-spin:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: scale(0.98);
+    }
+
+    .disclaimer {
+      font-size: 11px;
+      color: #475569;
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    /* Темы уровней */
+    .art-classic-3040 { background: radial-gradient(circle at 100% 50%, rgba(37,99,235,0.8), transparent 70%), linear-gradient(135deg, #0f172a, #1e3a8a); }
+    .art-classic-7550 { background: radial-gradient(circle at 0% 100%, rgba(220,38,38,0.7), transparent 60%), linear-gradient(135deg, #1e293b, #1e3a5f); }
+    .art-classic-1862 { background: linear-gradient(135deg, #134e4a, #0f172a); }
+    .art-classic-9200 { background: radial-gradient(circle at 50% 0%, rgba(16,185,129,0.5), transparent 70%), linear-gradient(135deg, #064e3b, #0f172a); }
+
+    .art-gold-3040 { background: radial-gradient(circle at 90% 10%, #fef08a, transparent 40%), linear-gradient(135deg, #78350f, #ca8a04, #451a03); }
+    .art-gold-7550 { background: radial-gradient(circle at 10% 90%, #f97316, transparent 50%), linear-gradient(135deg, #9a3412, #eab308, #431407); }
+    .art-gold-1862 { background: linear-gradient(135deg, #854d0e, #d97706, #1c1917); }
+    .art-gold-9200 { background: radial-gradient(circle at 50% 50%, rgba(250,204,21,0.6), transparent 70%), linear-gradient(135deg, #065f46, #b45309); }
+
+    .art-plat-3040 { background: linear-gradient(135deg, #334155, #64748b, #1e293b); }
+    .art-plat-7550 { background: radial-gradient(circle at 80% 80%, rgba(203,213,225,0.4), transparent 60%), linear-gradient(135deg, #475569, #0f172a); }
+    .art-plat-1862 { background: linear-gradient(135deg, #1e293b, #475569, #334155); }
+    .art-plat-9200 { background: radial-gradient(circle at 20% 20%, rgba(52,211,153,0.3), transparent 50%), linear-gradient(135deg, #334155, #1e293b); }
+
+    .art-black-3040 { background: radial-gradient(circle at 100% 0%, #1e1b4b, transparent 50%), #05070a; }
+    .art-black-7550 { background: radial-gradient(circle at 0% 100%, #3b0764, transparent 50%), #05070a; }
+    .art-black-1862 { background: radial-gradient(circle at 50% 50%, #042f2e, transparent 60%), #05070a; }
+    .art-black-9200 { background: radial-gradient(circle at 80% 20%, #064e3b, transparent 50%), #05070a; }
+  </style>
+</head>
+<body>
+
+  <!-- Профиль из Telegram -->
+  <div class="user-profile">
+    <div class="user-avatar" id="userAvatar">?</div>
+    <div class="user-name" id="userName">Player</div>
+  </div>
+
+  <!-- Инфо-панель над картой -->
+  <div class="info-panel">
+    <div class="rarity-word rarity-common" id="rarityText">ОБЫЧНЫЙ</div>
+    <div class="sub-info">
+      <span class="tier-badge" id="tierText">CLASSIC</span>
+      <span>•</span>
+      <span id="subNetName">VIZA 3040</span>
+    </div>
+  </div>
+
+  <!-- 3D Карточка -->
+  <div class="card-scene">
+    <div class="card" id="cardNode">
+      <div class="card-art art-classic-3040" id="cardArt"></div>
+      <div class="card-spinner-bg"></div>
+
+      <!-- Верхний бар -->
+      <div class="card-top">
+        <div class="chip"></div>
+        <svg class="nfc-icon" viewBox="0 0 24 24">
+          <path d="M8 8a6 6 0 0 1 0 8" />
+          <path d="M12 5a10 10 0 0 1 0 14" />
+          <path d="M16 2a15 15 0 0 1 0 20" />
+        </svg>
+      </div>
+
+      <!-- 16 Казино-барабанов для цифр -->
+      <div class="card-number-viewport" id="numbersContainer"></div>
+
+      <!-- Барабан логотипов -->
+      <div class="card-bottom">
+        <div class="network-viewport">
+          <div class="network-reel" id="networkReel"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Кнопка вращения -->
+  <div class="controls">
+    <button class="btn-spin" id="btnSpin">КРУТИТЬ</button>
+    <div class="disclaimer">
+      Все номера ломают алгоритм Луна и не являются платежным средством.
+    </div>
+  </div>
+
+  <script>
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+    }
+
+    // Профиль Telegram
+    (function initProfile() {
+      const user = tg?.initDataUnsafe?.user;
+      const nameEl = document.getElementById('userName');
+      const avEl = document.getElementById('userAvatar');
+      if (user) {
+        nameEl.textContent = user.first_name + (user.last_name ? ` ${user.last_name}` : '');
+        if (user.photo_url) avEl.innerHTML = `<img src="${user.photo_url}">`;
+        else avEl.textContent = (user.first_name[0] || 'U').toUpperCase();
+      } else {
+        nameEl.textContent = "Durov";
+        avEl.textContent = "D";
+      }
+    })();
+
+    // 4 Бренда платежных систем
+    const NETWORKS = [
+      {
+        id: 'viza',
+        name: 'VIZA',
+        bin: '3040',
+        artSuffix: '3040',
+        svg: `<svg viewBox="0 0 160 55" fill="none"><text x="0" y="44" font-family="Arial Black, Impact, sans-serif" font-weight="900" font-style="italic" font-size="52" fill="#FFFFFF" letter-spacing="-1">VIZA</text></svg>`[cite: 6]
+      },
+      {
+        id: 'masterkard',
+        name: 'MasterKard',
+        bin: '7550',
+        artSuffix: '7550',
+        svg: `<svg viewBox="0 0 110 70" fill="none"><rect x="0" y="0" width="68" height="70" rx="26" fill="#EA001B"/><rect x="42" y="0" width="68" height="70" rx="26" fill="#FFB000"/><path d="M 42 12 C 55 18 64 33 64 50 C 64 56 61 63 56 68 C 61 63 68 50 68 35 C 68 20 61 8 50 2 C 46 5 44 8 42 12 Z" fill="#FF5E00" opacity="0.95"/></svg>`[cite: 5]
+      },
+      {
+        id: 'onionpay',
+        name: 'OnionPay',
+        bin: '1862',
+        artSuffix: '1862',
+        svg: `<svg viewBox="0 0 135 60" fill="none"><g transform="skewX(-14)"><rect x="16" y="2" width="34" height="54" rx="4" fill="#6B11D9"/><rect x="46" y="2" width="34" height="54" rx="4" fill="#059669"/><rect x="76" y="2" width="40" height="54" rx="4" fill="#EAB308"/></g><text x="68" y="26" text-anchor="middle" font-family="sans-serif" font-weight="900" font-style="italic" font-size="17" fill="#FFFFFF">OnionPay</text><text x="68" y="46" text-anchor="middle" font-family="sans-serif" font-weight="800" font-size="14" fill="#FFFFFF" letter-spacing="1">洋葱</text></svg>`[cite: 3]
+      },
+      {
+        id: 'mig',
+        name: 'МИГ',
+        bin: '9200',
+        artSuffix: '9200',
+        svg: `<svg viewBox="0 0 160 55" fill="none"><path d="M 5 50 V 6 H 18 L 29 28 L 40 6 H 53 V 50 H 39 V 23 L 30 40 H 28 L 19 23 V 50 H 5 Z" fill="#22C55E"/><path d="M 62 50 V 6 H 76 V 32 L 95 6 H 109 V 50 H 95 V 23 L 76 50 H 62 Z" fill="#22C55E"/><path d="M 118 50 V 22 H 133 V 50 H 118 Z" fill="#22C55E"/><path d="M 116 6 H 158 C 158 14 150 18 138 18 H 116 V 6 Z" fill="#0EA5E9"/></svg>`[cite: 4]
+      }
+    ];
+
+    const TIERS = [
+      { id: 'classic', name: 'CLASSIC', artPrefix: 'art-classic' },
+      { id: 'gold', name: 'GOLD', artPrefix: 'art-gold' },
+      { id: 'platinum', name: 'PLATINUM', artPrefix: 'art-plat' },
+      { id: 'black', name: 'BLACK', artPrefix: 'art-black' }
+    ];
+
+    const DIGIT_H = 28;
+    const NUMBERS_CONTAINER = document.getElementById('numbersContainer');
+    const reels = [];
+    const currentDigits = [3,0,4,0, 1,2,3,4, 5,6,7,8, 9,0,1,2];
+
+    // Генерируем 16 барабанов: по 12 циклов цифр (120 штук) в каждом, чтобы цифры никогда не улетали в пустоту
+    for (let g = 0; g < 4; g++) {
+      const groupEl = document.createElement('div');
+      groupEl.className = 'digit-group';
+      for (let d = 0; d < 4; d++) {
+        const slotEl = document.createElement('div');
+        slotEl.className = 'slot-digit';
+
+        const reelEl = document.createElement('div');
+        reelEl.className = 'slot-reel';
+
+        let html = '';
+        for (let loop = 0; loop < 12; loop++) {
+          for (let n = 0; n <= 9; n++) {
+            html += `<div class="reel-num">${n}</div>`;
+          }
+        }
+        reelEl.innerHTML = html;
+        slotEl.appendChild(reelEl);
+        groupEl.appendChild(slotEl);
+
+        reels.push(reelEl);
+      }
+      NUMBERS_CONTAINER.appendChild(groupEl);
+    }
+
+    // Барабан логотипов (16 повторений)
+    const NETWORK_REEL = document.getElementById('networkReel');
+    const NET_HEIGHT = 44;
+    let netReelHtml = '';
+    for (let loop = 0; loop < 16; loop++) {
+      NETWORKS.forEach(net => {
+        netReelHtml += `<div class="network-item">${net.svg}</div>`;
+      });
+    }
+    NETWORK_REEL.innerHTML = netReelHtml;
+
+    // Установка начальных цифр
+    reels.forEach((reel, i) => {
+      reel.style.transform = `translate3d(0, -${currentDigits[i] * DIGIT_H}px, 0)`;
+    });
+
+    // Анти-Луна генератор
+    function generateAntiLuhnDigits(prefix4) {
+      let digits = prefix4.split('').map(Number);
+      while (digits.length < 15) {
+        digits.push(Math.floor(Math.random() * 10));
+      }
+      let sum = 0;
+      for (let i = 0; i < 15; i++) {
+        let val = digits[14 - i];
+        if (i % 2 === 0) {
+          val *= 2;
+          if (val > 9) val -= 9;
+        }
+        sum += val;
+      }
+      const validLast = (10 - (sum % 10)) % 10;
+      const invalidLast = (validLast + 3) % 10;
+      digits.push(invalidLast);
+      return digits;
+    }
+
+    // Расчет редкости
+    function calculateRarity(tierIndex, digits) {
+      const last8 = digits.slice(8).join('');
+      const uniqueCount = new Set(digits.slice(4)).size;
+
+      if (tierIndex === 3 || uniqueCount <= 4 || /(\d)\1\1\1/.test(last8)) {
+        return { text: 'МИФИЧЕСКИЙ', cls: 'rarity-mythic' };
+      }
+      if (tierIndex === 2 || uniqueCount <= 6 || /(\d)\1\1/.test(last8)) {
+        return { text: 'ЛЕГЕНДАРНЫЙ', cls: 'rarity-legendary' };
+      }
+      if (tierIndex === 1 || uniqueCount <= 8) {
+        return { text: 'РЕДКИЙ', cls: 'rarity-rare' };
+      }
+      return { text: 'ОБЫЧНЫЙ', cls: 'rarity-common' };
+    }
+
+    const btnSpin = document.getElementById('btnSpin');
+    const cardNode = document.getElementById('cardNode');
+    const cardArt = document.getElementById('cardArt');
+    const rarityText = document.getElementById('rarityText');
+    const tierText = document.getElementById('tierText');
+    const subNetName = document.getElementById('subNetName');
+
+    let isSpinning = false;
+
+    btnSpin.addEventListener('click', () => {
+      if (isSpinning) return;
+      isSpinning = true;
+      btnSpin.disabled = true;
+
+      tg?.HapticFeedback?.impactOccurred('heavy');
+
+      // Сбрасываем позицию барабанов в базовый диапазон перед стартом
+      reels.forEach((reel, i) => {
+        reel.style.transition = 'none';
+        reel.style.transform = `translate3d(0, -${currentDigits[i] * DIGIT_H}px, 0)`;
+      });
+      NETWORK_REEL.style.transition = 'none';
+      NETWORK_REEL.style.transform = `translate3d(0, 0px, 0)`;
+
+      // Принудительный reflow для применения сброса
+      void cardNode.offsetWidth;
+
+      // Режим спина
+      cardNode.classList.add('is-spinning');
+      rarityText.style.opacity = '0.25';
+      rarityText.style.transform = 'scale(0.85)';
+
+      // Выбираем результат
+      const netIdx = Math.floor(Math.random() * NETWORKS.length);
+      const selectedNet = NETWORKS[netIdx];
+
+      const tierIdx = Math.floor(Math.random() * TIERS.length);
+      const selectedTier = TIERS[tierIdx];
+
+      const finalDigits = generateAntiLuhnDigits(selectedNet.bin);
+      const rarity = calculateRarity(tierIdx, finalDigits);
+
+      // Запуск барабана логотипов (дольше и быстрее: 7 полных оборотов)
+      const targetNetPos = -( (7 * NETWORKS.length + netIdx) * NET_HEIGHT );
+      NETWORK_REEL.style.transition = 'transform 3.4s cubic-bezier(0.12, 0.95, 0.2, 1.02)';
+      NETWORK_REEL.style.transform = `translate3d(0, ${targetNetPos}px, 0)`;
+
+      // Запуск барабанов цифр (скорость казино: 50-80 полных циклов цифр)
+      reels.forEach((reel, idx) => {
+        const groupIndex = Math.floor(idx / 4);
+        // Количество полных оборотов увеличивается для каждой четверки
+        const baseCycles = 5 + groupIndex * 2; 
+        const targetDigit = finalDigits[idx];
+        const finalY = -( (baseCycles * 10 + targetDigit) * DIGIT_H );
+
+        reel.classList.add('blurring');
+
+        // Каждая четверка крутится дольше предыдущей (от 2.4с до 3.8с)
+        const duration = 2.4 + groupIndex * 0.45 + (idx % 4) * 0.04;
+        reel.style.transition = `transform ${duration}s cubic-bezier(0.12, 0.95, 0.2, 1.05)`;
+        reel.style.transform = `translate3d(0, ${finalY}px, 0)`;
+
+        setTimeout(() => {
+          reel.classList.remove('blurring');
+          tg?.HapticFeedback?.impactOccurred('light');
+        }, duration * 1000 - 180);
+      });
+
+      // Сохраняем текущие цифры
+      for (let i = 0; i < 16; i++) {
+        currentDigits[i] = finalDigits[i];
+      }
+
+      // Остановка и финал (ровно через 4.0 секунды)
+      setTimeout(() => {
+        cardArt.className = `card-art ${selectedTier.artPrefix}-${selectedNet.artSuffix}`;
+
+        cardNode.classList.remove('is-spinning');
+        cardNode.style.transform = 'scale(1.05) rotateX(0deg)';
+        setTimeout(() => { cardNode.style.transform = 'scale(1) rotateX(0deg)'; }, 240);
+
+        rarityText.className = `rarity-word ${rarity.cls}`;
+        rarityText.textContent = rarity.text;
+        rarityText.style.opacity = '1';
+        rarityText.style.transform = 'scale(1)';
+
+        tierText.textContent = selectedTier.name;
+        subNetName.textContent = `${selectedNet.name} ${selectedNet.bin}`;
+
+        tg?.HapticFeedback?.notificationOccurred('success');
+
+        isSpinning = false;
+        btnSpin.disabled = false;
+      }, 4000);
+    });
+  </script>
+</body>
+</html>
